@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Off-Road Racing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(45deg, #2c1810, #3d2814, #4a3018);
+            font-family: 'Impact', 'Arial Black', Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 30%, #2F4F4F 100%);
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+
+        .lap-info {
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        .position-info {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .speed-info {
+            color: #ff6600;
+            text-shadow: 0 0 10px #ff6600;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 1.1em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+
+        .start-screen, .race-complete {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0,0,0,0.9), rgba(40,40,40,0.9));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: all;
+        }
+
+        .start-screen h1 {
+            font-size: 4em;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px #ff6600;
+            color: #ff6600;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 30px #ff6600, 0 0 40px #ff6600; }
+            to { text-shadow: 0 0 50px #ff6600, 0 0 60px #ff6600; }
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6600, #ff9900);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 5px 15px rgba(255,102,0,0.3);
+        }
+
+        .btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(255,102,0,0.5);
+        }
+
+        .mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 15;
+            pointer-events: all;
+        }
+
+        .mobile-btn {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .steering-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .acceleration-controls {
+            display: flex;
+            justify-content: center;
+            gap: 100px;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+            .controls {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="ui-overlay">
+            <div class="hud">
+                <div class="lap-info">Vuelta: <span id="lapCount">1</span>/3</div>
+                <div class="position-info">Posición: <span id="position">1</span>/4</div>
+                <div class="speed-info">Velocidad: <span id="speed">0</span> km/h</div>
+            </div>
+            
+            <div class="controls">
+                <div>🏁 WASD o Flechas para conducir | ESPACIO para freno</div>
+                <div>🏆 ¡Recolecta power-ups y gana la carrera!</div>
+            </div>
+        </div>
+
+        <!-- Controles móviles -->
+        <div class="mobile-controls">
+            <div class="steering-controls">
+                <button class="mobile-btn" id="leftBtn">←</button>
+                <button class="mobile-btn" id="rightBtn">→</button>
+            </div>
+            <div class="acceleration-controls">
+                <button class="mobile-btn" id="upBtn">↑</button>
+                <button class="mobile-btn" id="downBtn">↓</button>
+            </div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <h1>🏁 SUPER OFF-ROAD</h1>
+            <p style="font-size: 1.5em; margin-bottom: 30px; text-align: center;">
+                ¡Carrera todoterreno extrema!
+            </p>
+            <button class="btn" onclick="iniciarCarrera()">🚗 INICIAR CARRERA</button>
+            <div style="margin-top: 30px; font-size: 1.1em; opacity: 0.8; text-align: center;">
+                <p>• Completa 3 vueltas antes que los rivales</p>
+                <p>• Recolecta power-ups para ventajas</p>
+                <p>• Evita los obstáculos del terreno</p>
+            </div>
+        </div>
+
+        <div class="race-complete" id="raceCompleteScreen" style="display: none;">
+            <h2 id="raceResult" style="font-size: 3em; margin-bottom: 20px;">🏆 ¡VICTORIA!</h2>
+            <p style="font-size: 1.5em; margin-bottom: 30px;">
+                Posición final: <span id="finalPosition">1</span>°
+            </p>
+            <button class="btn" onclick="reiniciarCarrera()">🔄 NUEVA CARRERA</button>
+            <button class="btn" onclick="volverMenu()">🏠 MENÚ PRINCIPAL</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURACIÓN DEL CANVAS Y JUEGO
+        // ========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        /**
+         * Ajusta el canvas al tamaño de la ventana
+         */
+        function ajustarCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        ajustarCanvas();
+        window.addEventListener('resize', ajustarCanvas);
+
+        // ========================================
+        // VARIABLES GLOBALES DEL JUEGO
+        // ========================================
+        let estadoJuego = 'menu'; // 'menu', 'corriendo', 'terminado'
+        let tiempoJuego = 0;
+        let cameraX = 0;
+        let cameraY = 0;
+
+        // Configuración de la pista
+        const PISTA = {
+            ancho: 2000,
+            alto: 1500,
+            checkpoints: []
+        };
+
+        function iniciarCarrera() {
+    inicializarPista();
+    estadoJuego = 'corriendo';
+    document.getElementById('startScreen').style.display = 'none';
+    configurarControlesMoviles();
+    loopJuego();
+}
+
+function reiniciarCarrera() {
+    iniciarCarrera();
+    document.getElementById('raceCompleteScreen').style.display = 'none';
+}
+
+function volverMenu() {
+    estadoJuego = 'menu';
+    document.getElementById('raceCompleteScreen').style.display = 'none';
+    document.getElementById('startScreen').style.display = 'flex';
+}
+
+function terminarCarrera() {
+    estadoJuego = 'terminado';
+    document.getElementById('raceCompleteScreen').style.display = 'flex';
+    document.getElementById('finalPosition').textContent = autos[0].posicion;
+    document.getElementById('raceResult').textContent =
+        autos[0].posicion === 1 ? '🏆 ¡VICTORIA!' : '💨 Mejor suerte la próxima';
+}
+
+function loopJuego() {
+    if (estadoJuego !== 'corriendo') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    actualizarCamara();
+    dibujarPista();
+    dibujarCheckpoints();
+    dibujarObstaculos();
+
+    powerups.forEach(p => {
+        p.actualizar();
+        p.dibujar();
+    });
+
+    autos.forEach(a => {
+        a.actualizar();
+        a.dibujar();
+        powerups.forEach(p => p.verificarColision(a));
+    });
+
+    calcularPosiciones();
+
+    requestAnimationFrame(loopJuego);
+}
+        
+        // ========================================
+        // SISTEMA DE AUTOS
+        // ========================================
+        class Auto {
+            constructor(x, y, color, esJugador = false) {
+                this.x = x;
+                this.y = y;
+                this.ancho = 30;
+                this.alto = 20;
+                this.angulo = 0;
+                this.velocidad = 0;
+                this.velocidadMaxima = esJugador ? 8 : 6;
+                this.aceleracion = 0.3;
+                this.friccion = 0.92;
+                this.velocidadGiro = 0.08;
+                this.color = color;
+                this.esJugador = esJugador;
+                this.vuelta = 1;
+                this.ultimoCheckpoint = 0;
+                this.posicion = 1;
+                this.powerups = {
+                    turbo: 0,
+                    salto: 0
+                };
+                // Variables para IA
+                this.objetivoX = x;
+                this.objetivoY = y;
+                this.tiempoUltimoObjetivo = 0;
+            }
+
+            /**
+             * Actualiza la física del auto
+             */
+            actualizar() {
+                if (this.esJugador) {
+                    this.manejarControles();
+                } else {
+                    this.manejarIA();
+                }
+
+                // Aplicar fricción
+                this.velocidad *= this.friccion;
+
+                // Calcular nueva posición
+                const dx = Math.cos(this.angulo) * this.velocidad;
+                const dy = Math.sin(this.angulo) * this.velocidad;
+                
+                this.x += dx;
+                this.y += dy;
+
+                // Mantener dentro de los límites de la pista
+                this.x = Math.max(50, Math.min(PISTA.ancho - 50, this.x));
+                this.y = Math.max(50, Math.min(PISTA.alto - 50, this.y));
+
+                // Verificar checkpoints
+                this.verificarCheckpoints();
+
+                // Actualizar HUD si es jugador
+                if (this.esJugador) {
+                    document.getElementById('speed').textContent = Math.round(Math.abs(this.velocidad * 20));
+                }
+            }
+
+            /**
+             * Maneja los controles del jugador
+             */
+            manejarControles() {
+                if (controles.arriba) {
+                    this.velocidad += this.aceleracion;
+                }
+                if (controles.abajo) {
+                    this.velocidad -= this.aceleracion * 0.8; // Reversa más lenta
+                }
+                if (controles.izquierda && Math.abs(this.velocidad) > 0.5) {
+                    this.angulo -= this.velocidadGiro * Math.abs(this.velocidad) / this.velocidadMaxima;
+                }
+                if (controles.derecha && Math.abs(this.velocidad) > 0.5) {
+                    this.angulo += this.velocidadGiro * Math.abs(this.velocidad) / this.velocidadMaxima;
+                }
+                if (controles.freno) {
+                    this.velocidad *= 0.85; // Freno
+                }
+
+                // Limitar velocidad
+                this.velocidad = Math.max(-this.velocidadMaxima * 0.5, 
+                                Math.min(this.velocidadMaxima, this.velocidad));
+            }
+
+            /**
+             * IA simple para autos rivales
+             */
+            manejarIA() {
+                const ahora = Date.now();
+                
+                // Actualizar objetivo cada cierto tiempo
+                if (ahora - this.tiempoUltimoObjetivo > 1000) {
+                    this.actualizarObjetivoIA();
+                    this.tiempoUltimoObjetivo = ahora;
+                }
+
+                // Calcular dirección hacia objetivo
+                const dx = this.objetivoX - this.x;
+                const dy = this.objetivoY - this.y;
+                const anguloObjetivo = Math.atan2(dy, dx);
+                
+                // Ajustar ángulo gradualmente
+                let diferencia = anguloObjetivo - this.angulo;
+                while (diferencia > Math.PI) diferencia -= 2 * Math.PI;
+                while (diferencia < -Math.PI) diferencia += 2 * Math.PI;
+                
+                if (Math.abs(diferencia) > 0.1) {
+                    this.angulo += Math.sign(diferencia) * this.velocidadGiro;
+                }
+
+                // Acelerar hacia el objetivo
+                const distancia = Math.sqrt(dx * dx + dy * dy);
+                if (distancia > 50) {
+                    this.velocidad += this.aceleracion * 0.8;
+                    this.velocidad = Math.min(this.velocidadMaxima * 0.9, this.velocidad);
+                }
+            }
+
+            /**
+             * Actualiza el objetivo de la IA
+             */
+            actualizarObjetivoIA() {
+                // Buscar el siguiente checkpoint
+                const checkpoint = puntosDeCarrera[this.ultimoCheckpoint % puntosDeCarrera.length];
+                this.objetivoX = checkpoint.x + (Math.random() - 0.5) * 100;
+                this.objetivoY = checkpoint.y + (Math.random() - 0.5) * 100;
+            }
+
+            /**
+             * Verifica si el auto pasó por checkpoints
+             */
+            verificarCheckpoints() {
+                puntosDeCarrera.forEach((checkpoint, index) => {
+                    const dx = this.x - checkpoint.x;
+                    const dy = this.y - checkpoint.y;
+                    const distancia = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distancia < 80 && index === (this.ultimoCheckpoint % puntosDeCarrera.length)) {
+                        this.ultimoCheckpoint++;
+                        
+                        // Si completó todos los checkpoints, nueva vuelta
+                        if (this.ultimoCheckpoint % puntosDeCarrera.length === 0 && this.ultimoCheckpoint > 0) {
+                            this.vuelta++;
+                            
+                            if (this.esJugador) {
+                                document.getElementById('lapCount').textContent = this.vuelta;
+                                
+                                // Verificar si completó la carrera
+                                if (this.vuelta > 3) {
+                                    terminarCarrera();
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            /**
+             * Dibuja el auto en el canvas
+             */
+            dibujar() {
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y - cameraY);
+                ctx.rotate(this.angulo);
+                
+                // Cuerpo del auto
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.ancho/2, -this.alto/2, this.ancho, this.alto);
+                
+                // Detalles del auto
+                ctx.fillStyle = this.esJugador ? '#ffffff' : '#333333';
+                ctx.fillRect(-this.ancho/2 + 5, -this.alto/2 + 3, this.ancho - 10, 4);
+                ctx.fillRect(-this.ancho/2 + 5, this.alto/2 - 7, this.ancho - 10, 4);
+                
+                // Parabrisas
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(-this.ancho/2 + 8, -this.alto/2 + 8, this.ancho - 16, this.alto - 16);
+                
+                // Indicador de jugador
+                if (this.esJugador) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.beginPath();
+                    ctx.arc(0, -this.alto, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        // ========================================
+        // SISTEMA DE POWER-UPS
+        // ========================================
+        class PowerUp {
+            constructor(x, y, tipo) {
+                this.x = x;
+                this.y = y;
+                this.tipo = tipo; // 'turbo', 'salto', 'escudo'
+                this.activo = true;
+                this.animacion = 0;
+                this.colores = {
+                    turbo: '#ff0000',
+                    salto: '#00ff00',
+                    escudo: '#0000ff'
+                };
+            }
+
+            /**
+             * Actualiza la animación del power-up
+             */
+            actualizar() {
+                this.animacion += 0.1;
+            }
+
+            /**
+             * Dibuja el power-up
+             */
+            dibujar() {
+                if (!this.activo) return;
+                
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y - cameraY);
+                ctx.rotate(this.animacion);
+                
+                const pulso = 1 + Math.sin(this.animacion * 3) * 0.2;
+                ctx.scale(pulso, pulso);
+                
+                ctx.fillStyle = this.colores[this.tipo];
+                ctx.shadowColor = this.colores[this.tipo];
+                ctx.shadowBlur = 20;
+                
+                // Forma del power-up
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angulo = (i / 8) * Math.PI * 2;
+                    const radio = i % 2 === 0 ? 15 : 8;
+                    const x = Math.cos(angulo) * radio;
+                    const y = Math.sin(angulo) * radio;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            /**
+             * Verifica colisión con un auto
+             */
+            verificarColision(auto) {
+                if (!this.activo) return false;
+                
+                const dx = this.x - auto.x;
+                const dy = this.y - auto.y;
+                const distancia = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distancia < 25) {
+                    this.activo = false;
+                    // Aplicar efecto del power-up
+                    this.aplicarEfecto(auto);
+                    return true;
+                }
+                return false;
+            }
+
+            /**
+             * Aplica el efecto del power-up al auto
+             */
+            aplicarEfecto(auto) {
+                switch (this.tipo) {
+                    case 'turbo':
+                        auto.velocidad += 5;
+                        break;
+                    case 'salto':
+                        auto.powerups.salto = 60; // 60 frames de salto
+                        break;
+                    case 'escudo':
+                        auto.powerups.escudo = 180; // 3 segundos de escudo
+                        break;
+                }
+            }
+        }
+
+        // ========================================
+        // INICIALIZACIÓN DEL JUEGO
+        // ========================================
+        let autos = [];
+        let powerups = [];
+        let obstaculos = [];
+        let puntosDeCarrera = [];
+
+        /**
+         * Inicializa la pista y elementos del juego
+         */
+        function inicializarPista() {
+            // Puntos de la carrera (checkpoints)
+            puntosDeCarrera = [
+                {x: 200, y: 200},
+                {x: 800, y: 150},
+                {x: 1400, y: 300},
+                {x: 1700, y: 700},
+                {x: 1500, y: 1200},
+                {x: 1000, y: 1300},
+                {x: 500, y: 1100},
+                {x: 100, y: 600}
+            ];
+
+            // Crear autos
+            autos = [
+                new Auto(150, 250, '#ff3366', true), // Jugador
+                new Auto(150, 200, '#3366ff', false), // IA 1
+                new Auto(150, 300, '#33ff66', false), // IA 2
+                new Auto(150, 350, '#ffff33', false)  // IA 3
+            ];
+
+            // Crear power-ups
+            powerups = [];
+            const tiposPowerUp = ['turbo', 'salto', 'escudo'];
+            for (let i = 0; i < 15; i++) {
+                const x = 100 + Math.random() * (PISTA.ancho - 200);
+                const y = 100 + Math.random() * (PISTA.alto - 200);
+                const tipo = tiposPowerUp[Math.floor(Math.random() * tiposPowerUp.length)];
+                powerups.push(new PowerUp(x, y, tipo));
+            }
+
+            // Crear obstáculos
+            obstaculos = [];
+            for (let i = 0; i < 25; i++) {
+                obstaculos.push({
+                    x: 100 + Math.random() * (PISTA.ancho - 200),
+                    y: 100 + Math.random() * (PISTA.alto - 200),
+                    ancho: 20 + Math.random() * 40,
+                    alto: 20 + Math.random() * 40,
+                    tipo: Math.random() < 0.5 ? 'roca' : 'arbol'
+                });
+            }
+        }
+
+        /**
+         * Actualiza la posición de la cámara
+         */
+        function actualizarCamara() {
+            const jugador = autos[0];
+            cameraX = jugador.x - canvas.width / 2;
+            cameraY = jugador.y - canvas.height / 2;
+            
+            // Limitar cámara a los bordes de la pista
+            cameraX = Math.max(0, Math.min(PISTA.ancho - canvas.width, cameraX));
+            cameraY = Math.max(0, Math.min(PISTA.alto - canvas.height, cameraY));
+        }
+
+        /**
+         * Calcula las posiciones de los autos
+         */
+        function calcularPosiciones() {
+            // Ordenar autos por progreso en la carrera
+            const autosOrdenados = [...autos].sort((a, b) => {
+                if (a.vuelta !== b.vuelta) return b.vuelta - a.vuelta;
+                return b.ultimoCheckpoint - a.ultimoCheckpoint;
+            });
+            
+            autosOrdenados.forEach((auto, index) => {
+                auto.posicion = index + 1;
+            });
+            
+            document.getElementById('position').textContent = autos[0].posicion;
+        }
+
+        // ========================================
+        // SISTEMA DE CONTROLES
+        // ========================================
+        const controles = {
+            arriba: false,
+            abajo: false,
+            izquierda: false,
+            derecha: false,
+            freno: false
+        };
+
+        // Controles de teclado
+        document.addEventListener('keydown', (e) => {
+            switch(e.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    controles.arriba = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    controles.abajo = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    controles.izquierda = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    controles.derecha = true;
+                    e.preventDefault();
+                    break;
+                case 'Space':
+                    controles.freno = true;
+                    e.preventDefault();
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    controles.arriba = false;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    controles.abajo = false;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    controles.izquierda = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    controles.derecha = false;
+                    break;
+                case 'Space':
+                    controles.freno = false;
+                    break;
+            }
+        });
+
+        // Controles móviles
+        function configurarControlesMoviles() {
+            const botones = {
+                upBtn: 'arriba',
+                downBtn: 'abajo',
+                leftBtn: 'izquierda',
+                rightBtn: 'derecha'
+            };
+
+            Object.entries(botones).forEach(([id, control]) => {
+                const boton = document.getElementById(id);
+                
+                boton.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    controles[control] = true;
+                });
+                
+                boton.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    controles[control] = false;
+                });
+                
+                boton.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    controles[control] = true;
+                });
+                
+                boton.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    controles[control] = false;
+                });
+            });
+        }
+
+        // ========================================
+        // SISTEMA DE RENDERIZADO
+        // ========================================
+        
+        /**
+         * Dibuja el fondo de la pista
+         */
+        function dibujarPista() {
+            // Fondo de césped
+            ctx.fillStyle = '#228b22';
+            ctx.fillRect(-cameraX, -cameraY, PISTA.ancho, PISTA.alto);
+            
+            // Pista de tierra
+            ctx.strokeStyle = '#8b4513';
+            ctx.lineWidth = 160;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            puntosDeCarrera.forEach((punto, index) => {
+                const x = punto.x - cameraX;
+                const y = punto.y - cameraY;
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.closePath();
+            ctx.stroke();
+            
+            // Línea central
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([20, 20]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        /**
+         * Dibuja los checkpoints
+         */
+        function dibujarCheckpoints() {
+            puntosDeCarrera.forEach((checkpoint, index) => {
+                ctx.save();
+                ctx.fillStyle = '#ffff00';
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 3;
+                
+                const x = checkpoint.x - cameraX;
+                const y = checkpoint.y - cameraY;
+                
+                // Bandera de checkpoint
+                ctx.fillRect(x - 30, y - 40, 60, 80);
+                ctx.strokeRect(x - 30, y - 40, 60, 80);
+                
+                // Número del checkpoint
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText((index + 1).toString(), x, y + 6);
+                
+                ctx.restore();
+            });
+        }
+
+        /**
+         * Dibuja los obstáculos
+         */
+        function dibujarObstaculos() {
+            obstaculos.forEach(obs => {
+                ctx.save();
+                const x = obs.x - cameraX;
+                const y = obs.y - cameraY;
+                
+                if (obs.tipo === 'roca') {
+                    ctx.fillStyle = '#696969';
+                    ctx.strokeStyle = '#2f2f2f';
+                    ctx.lineWidth = 2;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, obs.ancho/2, obs.alto/2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    // Árbol
+                    ctx.fillStyle = '#8b4513';
+                    ctx.fillRect(x - 5, y - obs.alto/2, 10, obs.alto);
+                    
+                    ctx.fillStyle = '#228b22';
+                    ctx.beginPath();
+                    ctx.ellipse(x, y - obs.alto/2, obs.ancho/2, obs.ancho/2, 0, 0, Math.PI * 2);
+                    ctx.fill

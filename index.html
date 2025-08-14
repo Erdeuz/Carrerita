@@ -155,6 +155,7 @@
             font-weight: bold;
             touch-action: manipulation;
             user-select: none;
+            cursor: pointer;
         }
 
         .steering-controls {
@@ -263,57 +264,64 @@
             checkpoints: []
         };
 
+        // Variables globales para el juego
+        let autos = [];
+        let powerups = [];
+        let obstaculos = [];
+        let puntosDeCarrera = [];
+
         function iniciarCarrera() {
-    inicializarPista();
-    estadoJuego = 'corriendo';
-    document.getElementById('startScreen').style.display = 'none';
-    configurarControlesMoviles();
-    loopJuego();
-}
+            inicializarPista();
+            estadoJuego = 'corriendo';
+            document.getElementById('startScreen').style.display = 'none';
+            configurarControlesMoviles();
+            loopJuego();
+        }
 
-function reiniciarCarrera() {
-    iniciarCarrera();
-    document.getElementById('raceCompleteScreen').style.display = 'none';
-}
+        function reiniciarCarrera() {
+            iniciarCarrera();
+            document.getElementById('raceCompleteScreen').style.display = 'none';
+        }
 
-function volverMenu() {
-    estadoJuego = 'menu';
-    document.getElementById('raceCompleteScreen').style.display = 'none';
-    document.getElementById('startScreen').style.display = 'flex';
-}
+        function volverMenu() {
+            estadoJuego = 'menu';
+            document.getElementById('raceCompleteScreen').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex';
+        }
 
-function terminarCarrera() {
-    estadoJuego = 'terminado';
-    document.getElementById('raceCompleteScreen').style.display = 'flex';
-    document.getElementById('finalPosition').textContent = autos[0].posicion;
-    document.getElementById('raceResult').textContent =
-        autos[0].posicion === 1 ? '🏆 ¡VICTORIA!' : '💨 Mejor suerte la próxima';
-}
+        function terminarCarrera() {
+            estadoJuego = 'terminado';
+            document.getElementById('raceCompleteScreen').style.display = 'flex';
+            document.getElementById('finalPosition').textContent = autos[0].posicion;
+            document.getElementById('raceResult').textContent =
+                autos[0].posicion === 1 ? '🏆 ¡VICTORIA!' : '💨 Mejor suerte la próxima';
+        }
 
-function loopJuego() {
-    if (estadoJuego !== 'corriendo') return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function loopJuego() {
+            if (estadoJuego !== 'corriendo') return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    actualizarCamara();
-    dibujarPista();
-    dibujarCheckpoints();
-    dibujarObstaculos();
+            actualizarCamara();
+            dibujarPista();
+            dibujarCheckpoints();
+            dibujarObstaculos();
 
-    powerups.forEach(p => {
-        p.actualizar();
-        p.dibujar();
-    });
+            powerups.forEach(p => {
+                p.actualizar();
+                p.dibujar();
+            });
 
-    autos.forEach(a => {
-        a.actualizar();
-        a.dibujar();
-        powerups.forEach(p => p.verificarColision(a));
-    });
+            autos.forEach(a => {
+                a.actualizar();
+                a.dibujar();
+                powerups.forEach(p => p.verificarColision(a));
+            });
 
-    calcularPosiciones();
+            calcularPosiciones();
 
-    requestAnimationFrame(loopJuego);
-}
+            requestAnimationFrame(loopJuego);
+        }
         
         // ========================================
         // SISTEMA DE AUTOS
@@ -442,9 +450,11 @@ function loopJuego() {
              */
             actualizarObjetivoIA() {
                 // Buscar el siguiente checkpoint
-                const checkpoint = puntosDeCarrera[this.ultimoCheckpoint % puntosDeCarrera.length];
-                this.objetivoX = checkpoint.x + (Math.random() - 0.5) * 100;
-                this.objetivoY = checkpoint.y + (Math.random() - 0.5) * 100;
+                if (puntosDeCarrera.length > 0) {
+                    const checkpoint = puntosDeCarrera[this.ultimoCheckpoint % puntosDeCarrera.length];
+                    this.objetivoX = checkpoint.x + (Math.random() - 0.5) * 100;
+                    this.objetivoY = checkpoint.y + (Math.random() - 0.5) * 100;
+                }
             }
 
             /**
@@ -603,14 +613,6 @@ function loopJuego() {
             }
         }
 
-        // ========================================
-        // INICIALIZACIÓN DEL JUEGO
-        // ========================================
-        let autos = [];
-        let powerups = [];
-        let obstaculos = [];
-        let puntosDeCarrera = [];
-
         /**
          * Inicializa la pista y elementos del juego
          */
@@ -764,6 +766,7 @@ function loopJuego() {
 
             Object.entries(botones).forEach(([id, control]) => {
                 const boton = document.getElementById(id);
+                if (!boton) return;
                 
                 boton.addEventListener('touchstart', (e) => {
                     e.preventDefault();
@@ -879,4 +882,22 @@ function loopJuego() {
                     ctx.fillStyle = '#228b22';
                     ctx.beginPath();
                     ctx.ellipse(x, y - obs.alto/2, obs.ancho/2, obs.ancho/2, 0, 0, Math.PI * 2);
-                    ctx.fill
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            });
+        }
+
+        // Prevenir el comportamiento predeterminado del scroll en móviles
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Prevenir zoom en móviles
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
